@@ -1,0 +1,6 @@
+[submodule "trivy_api"]
+	path = trivy_api
+	url = https://github.com/aquasecurity/harbor-scanner-trivy
+[submodule "trivy_db"]
+	path = trivy_db
+	url = https://github.com/aquasecurity/trivy-db
