@@ -1,0 +1,10 @@
+ENV_REGISTRY=registry.docker.io
+
+ENV_IMAGE_API=aquasec/harbor-scanner-trivy
+ENV_IMAGE_API_TAG=dev
+
+ENV_IMAGE_DB=aquasecurity/trivy-db
+ENV_IMAGE_DB_TAG=2
+
+ENV_TRIVY_VERSION=0.29.2
+ENV_TRIVY_API_VERSION=0.30.0 

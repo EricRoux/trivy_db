@@ -1,11 +1,11 @@
-ARG TRIVY_VERSION=0.32.1
-ARG TRIVY_API_VERSION=0.30.0
+ARG TRIVY_VERSION
+ARG TRIVY_API_VERSION
 
 # Build stage
-FROM golang:1.18.3-alpine3.16 AS buildTriviApi
+FROM golang:1.19.2-alpine3.16 AS buildTriviApi
 ENV COOS linux
-ADD ./trivy_api/ /go/src
-ADD ./src /go/src
+ADD ./api/ /go/src
+ADD ./src/api /go/src
 WORKDIR /go/src
 RUN go build -o scanner-trivy cmd/scanner-trivy/main.go
 
@@ -15,7 +15,6 @@ FROM aquasec/trivy:${TRIVY_VERSION}
 ARG TRIVY_VERSION
 ARG TRIVY_API_VERSION
 RUN adduser -u 10000 -D -g '' scanner scanner
-RUN apk add --update --no-cache curl
 
 COPY --from=buildTriviApi /go/src/scanner-trivy /home/scanner/bin/scanner-trivy
 
