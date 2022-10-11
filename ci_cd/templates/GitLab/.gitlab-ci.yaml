@@ -41,14 +41,14 @@ status:
         "https://${CI_REGISTRY}/api/v2.0/projects/${CI_UNSAFE_PROJECT}/repositories/${CI_REPOSITORY}/artifacts/${CI_COMMIT_TAG}?with_scan_overview=true"
         -H "X-Accept-Vulnerabilities: application/vnd.security.vulnerability.report; version=1.1, application/vnd.scanner.adapter.vuln.report.harbor+json; version=1.0"
         | jq '."scan_overview"."application/vnd.security.vulnerability.report; version=1.1"."severity"');
-      if [[ " ${valid_values[*]} " =~ " ${response} " ]]; 
-      then echo ${response};
-      exit 0; 
-      elif [[ ! " ${response} " =~ " null " ]]; 
-      then echo ${response};
-      exit 1;
-      fi;
-      sleep 30;
+        if [[ " ${valid_values[*]} " =~ " ${response} " ]]; 
+          then echo ${response};
+          exit 0; 
+        elif [[ ! " ${response} " =~ " null " ]]; 
+          then echo ${response};
+          exit 1;
+        fi;
+        sleep 30;
       done;
       exit 1;
   tags:
