@@ -1,0 +1,73 @@
+stages:
+  - build-image
+  - vul-check
+  - deploy
+
+
+.tags-list: &tags
+  tags:
+    - runner-tag
+
+.build_template: &build_configuration
+  image:
+    name: gcr.io/kaniko-project/executor:v1.9.1-debug
+    entrypoint: ["/busybox/sh", "-c"]
+  <<: *tags
+
+
+build-image:
+  <<: *build_configuration
+  stage: build-image
+  script:
+    - /kaniko/executor --context ${CI_PROJECT_DIR} 
+      --dockerfile ${CI_PROJECT_DIR}/Dockerfile 
+      --no-push 
+      --destination ${CI_REGISTRY}/${CI_PROJECT}/${CI_REPOSITORY}:${CI_COMMIT_TAG}
+      --tarPath image.tar
+  only:
+    - tags
+  artifacts:
+    untracked: true
+
+
+status:
+  image:
+    name: aquasec/trivy:0.32.1
+  stage: vul-check
+  dependencies: 
+    - build-image
+  before_script:
+    - mkdir /fs
+    - tar -C /fs -xvf image.tar >/dev/null
+    - find /fs -name "*.tar.gz" -exec tar -C /fs -xvzf {} >/dev/null \;
+  script:
+    - trivy fs --exit-code 1 --no-progress --db-repository ${CI_TRIVY_DB_REPO} --severity MEDIUM,HIGH,CRITICAL /fs
+  only:
+    - tags
+  <<: *tags
+
+
+deploy:
+  <<: *build_configuration
+  stage: deploy
+  before_script:
+    - echo "{\"auths\":{\"${CI_REGISTRY}\":{\"username\":\"${CI_REGISTRY_USER}\",\"password\":\"${CI_REGISTRY_PASSWORD}\"}}}" > /kaniko/.docker/config.json
+  script:
+    - /kaniko/executor --skip-tls-verify --context ${CI_PROJECT_DIR} 
+      --dockerfile ${CI_PROJECT_DIR}/Dockerfile 
+      --destination ${CI_REGISTRY}/${CI_PROJECT}/${CI_REPOSITORY}:${CI_COMMIT_TAG}
+  only:
+    - tags
+
+
+deploy-unsafe:
+  <<: *build_configuration
+  stage: deploy
+  before_script:
+    - echo "{\"auths\":{\"${CI_REGISTRY}\":{\"username\":\"${CI_REGISTRY_USER}\",\"password\":\"${CI_REGISTRY_PASSWORD}\"}}}" > /kaniko/.docker/config.json
+  script:
+    - /kaniko/executor --skip-tls-verify --context ${CI_PROJECT_DIR} 
+      --dockerfile ${CI_PROJECT_DIR}/Dockerfile 
+      --destination ${CI_REGISTRY}/${CI_UNSAFE_PROJECT}/${CI_REPOSITORY}:${CI_COMMIT_TAG}
+  only:
+    - web

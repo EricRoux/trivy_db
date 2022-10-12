@@ -3,9 +3,9 @@ stages:
   - vul-stat
   - build
 
-
-.tags: 
-#   - runner
+.tags-list: &tags
+  tags:
+    - runner-tag
 
 .build_template: &build_configuration
   image:
@@ -15,6 +15,7 @@ stages:
     - echo "{\"auths\":{\"${CI_REGISTRY}\":{\"username\":\"${CI_REGISTRY_USER}\",\"password\":\"${CI_REGISTRY_PASSWORD}\"}}}" > /kaniko/.docker/config.json
   only:
     - tags
+  <<: *tags
 
 build-unsafe:
   <<: *build_configuration
@@ -23,9 +24,6 @@ build-unsafe:
     - /kaniko/executor --skip-tls-verify --context ${CI_PROJECT_DIR} 
       --dockerfile ${CI_PROJECT_DIR}/Dockerfile 
       --destination ${CI_REGISTRY}/${CI_UNSAFE_PROJECT}/${CI_REPOSITORY}:${CI_COMMIT_TAG}
-  tags:
-    <<: &tags
-
 
 status:
   image:
@@ -34,25 +32,26 @@ status:
   stage: vul-stat
   script:
     - >
-      valid_values=("None" "Low" "Medium")
+      valid_values=("None" "Low" "Medium");
       for i in {1..10};
       do response=$(
-        curl -u ${CI_REGISTRY_USER}:${CI_REGISTRY_PASSWORD} -X "GET" 
-        "https://${CI_REGISTRY}/api/v2.0/projects/${CI_UNSAFE_PROJECT}/repositories/${CI_REPOSITORY}/artifacts/${CI_COMMIT_TAG}?with_scan_overview=true"
-        -H "X-Accept-Vulnerabilities: application/vnd.security.vulnerability.report; version=1.1, application/vnd.scanner.adapter.vuln.report.harbor+json; version=1.0"
-        | jq '."scan_overview"."application/vnd.security.vulnerability.report; version=1.1"."severity"');
-        if [[ " ${valid_values[*]} " =~ " ${response} " ]]; 
-          then echo ${response};
-          exit 0; 
-        elif [[ ! " ${response} " =~ " null " ]]; 
-          then echo ${response};
-          exit 1;
-        fi;
-        sleep 30;
+      curl -u ${CI_REGISTRY_USER}:${CI_REGISTRY_PASSWORD} -X "GET" 
+      "https://${CI_REGISTRY}/api/v2.0/projects/${CI_UNSAFE_PROJECT}/repositories/${CI_REPOSITORY}/artifacts/${CI_COMMIT_TAG}?with_scan_overview=true"
+      -H "X-Accept-Vulnerabilities: application/vnd.security.vulnerability.report; version=1.1, application/vnd.scanner.adapter.vuln.report.harbor+json; version=1.0"
+      | jq '."scan_overview"."application/vnd.security.vulnerability.report; version=1.1"."severity"');
+      if [[ " ${valid_values[*]} " =~ " ${response//\"/} " ]]; 
+      then echo ${response};
+      exit 0; 
+      elif [[ ! " ${response//\"/} " =~ " null " ]]; 
+      then echo ${response};
+      exit 1;
+      fi;
+      sleep 30;
       done;
       exit 1;
-  tags:
-    <<: &tags
+  only:
+    - tags
+  <<: *tags
 
 
 build:
@@ -62,5 +61,3 @@ build:
     - /kaniko/executor --skip-tls-verify --context ${CI_PROJECT_DIR} 
       --dockerfile ${CI_PROJECT_DIR}/Dockerfile 
       --destination ${CI_REGISTRY}/${CI_PROJECT}/${CI_REPOSITORY}:${CI_COMMIT_TAG}
-  tags:
-    <<: &tags
