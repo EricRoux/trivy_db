@@ -3,12 +3,15 @@ import org.apache.commons.lang.StringEscapeUtils;
 import groovy.json.JsonOutput;
 
 @NonCPS
-def request(url, method){
+def request(url, method, auth){
     def req = new URL("${url}").openConnection();
     req.setRequestMethod("${method}");
     req.setDoOutput(true);
+    req.setRequestProperty("Accept", "*/*");
     req.setRequestProperty("Content-Type", "application/json");
     req.setRequestProperty("X-Accept-Vulnerabilities", "application/vnd.security.vulnerability.report; version=1.1, application/vnd.scanner.adapter.vuln.report.harbor+json; version=1.0");
+    if(auth != "")
+      req.setRequestProperty("Authorization", "Basic ${auth}");
     return req.content.text;
 }
 
@@ -16,7 +19,9 @@ pipeline {
   agent any;
         
   environment {
-      registryCredential = ''; // Regstry credential
+      registryCredential = ""; // Regstry credential !!!
+      gitRepoUrl = ""; // Repository !!!
+      gitCredential = "" // git credential !!!
   }
 
   parameters {
@@ -48,14 +53,16 @@ pipeline {
 
   stages {
     stage("Build unsafe"){
-      step{
-        if(${PROJECT_DIR} != "") {
-          sh """
-            echo '${PROJECT_DIR}/Dockerfile' > Dockerfile
-          """;
-        }
-
+      steps{
         script {
+          git url: gitRepoUrl, branch: "master", credentialsId: gitCredential
+
+          if(PROJECT_DIR != "") {
+            sh """
+              echo '${PROJECT_DIR}/Dockerfile' > Dockerfile
+            """;
+          }
+
           docker.withRegistry("https://${DOCKER_REGISTRY}", registryCredential) {
               def image = docker.build("${UNSAFE_PROJECT}/${REPOSITORY}", ".");
               image.push("${TAG}");
@@ -65,43 +72,51 @@ pipeline {
     }
 
     stage("Vulnerabilities status"){
-      step {
+      steps {
         script {
           validValues = ["None", "Low", "Medium"];
+          def auth = "";
+          withCredentials([usernamePassword(credentialsId: registryCredential, usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
+            auth = "${USERNAME}:${PASSWORD}".getBytes().encodeBase64().toString()
+          }
     
           def jsonSlurper = new JsonSlurper();
+          def status = "";
           for(int i = 0; i < 10; i++){
             def getRC = request(
               "https://${DOCKER_REGISTRY}/api/v2.0/projects/${UNSAFE_PROJECT}/repositories/${REPOSITORY}/artifacts/${TAG}?with_scan_overview=true",
-              "GET"
+              "GET",
+              auth
             );
             
             def json = jsonSlurper.parseText(getRC); 
-            def status = json["scan_overview"]["application/vnd.security.vulnerability.report; version=1.1"]["severity"];
+            status = json["scan_overview"]["application/vnd.security.vulnerability.report; version=1.1"]["severity"];
 
             if(status in validValues){
-              sh "exit 0";
+              println "Vuln status: ${status}";
+              return 0;
             } else if (status != "null") {
+              println "Vuln status: ${status}";
               sh "exit 1";
             }
-
             sleep(30);
           }
-
+          println "Status not found";
           sh "exit 1";
         }
       }
     }
-
     stage("Build"){
-      step{
-        if(${PROJECT_DIR} != "") {
-          sh """
-            echo '${PROJECT_DIR}/Dockerfile' > Dockerfile
-          """;
-        }
-
+      steps{
         script {
+          git url: gitRepoUrl, branch: "master", credentialsId: gitCredential
+
+          if(PROJECT_DIR != "") {
+            sh """
+              echo '${PROJECT_DIR}/Dockerfile' > Dockerfile
+            """;
+          }
+
           docker.withRegistry("https://${DOCKER_REGISTRY}", registryCredential) {
               def image = docker.build("${PROJECT}/${REPOSITORY}", ".");
               image.push("${TAG}");
