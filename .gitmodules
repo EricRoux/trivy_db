@@ -4,6 +4,6 @@
 [submodule "db"]
 	path = db
 	url = https://github.com/aquasecurity/trivy-db
-[submodule "helm"]
+[submodule "ci_cd/helm"]
 	path = ci_cd/helm
 	url = https://github.com/EricRoux/trivy_helm
