@@ -24,8 +24,8 @@ build-image:
       --no-push 
       --destination ${CI_REGISTRY}/${CI_PROJECT}/${CI_REPOSITORY}:${CI_COMMIT_TAG}
       --tarPath image.tar
-  only:
-    - tags
+  rules:
+    - if: $CI_COMMIT_BRANCH =~ "release" && $CI_COMMIT_TAG && $CI_PIPELINE_SOURCE != "web"
   artifacts:
     untracked: true
 
@@ -42,8 +42,8 @@ status:
     - find /fs -name "*.tar.gz" -exec tar -C /fs -xvzf {} >/dev/null \;
   script:
     - trivy fs --exit-code 1 --no-progress --db-repository ${CI_TRIVY_DB_REPO} --severity MEDIUM,HIGH,CRITICAL /fs
-  only:
-    - tags
+  rules:
+    - if: $CI_COMMIT_BRANCH =~ "release" && $CI_COMMIT_TAG && $CI_PIPELINE_SOURCE != "web"
   <<: *tags
 
 
@@ -56,18 +56,5 @@ deploy:
     - /kaniko/executor --skip-tls-verify --context ${CI_PROJECT_DIR} 
       --dockerfile ${CI_PROJECT_DIR}/Dockerfile 
       --destination ${CI_REGISTRY}/${CI_PROJECT}/${CI_REPOSITORY}:${CI_COMMIT_TAG}
-  only:
-    - tags
-
-
-deploy-unsafe:
-  <<: *build_configuration
-  stage: deploy
-  before_script:
-    - echo "{\"auths\":{\"${CI_REGISTRY}\":{\"username\":\"${CI_REGISTRY_USER}\",\"password\":\"${CI_REGISTRY_PASSWORD}\"}}}" > /kaniko/.docker/config.json
-  script:
-    - /kaniko/executor --skip-tls-verify --context ${CI_PROJECT_DIR} 
-      --dockerfile ${CI_PROJECT_DIR}/Dockerfile 
-      --destination ${CI_REGISTRY}/${CI_UNSAFE_PROJECT}/${CI_REPOSITORY}:${CI_COMMIT_TAG}
-  only:
-    - web
+  rules:
+    - if: $CI_COMMIT_BRANCH =~ "release" && $CI_COMMIT_TAG

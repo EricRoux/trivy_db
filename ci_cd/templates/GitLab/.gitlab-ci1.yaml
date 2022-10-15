@@ -13,8 +13,6 @@ stages:
     entrypoint: ["/busybox/sh", "-c"]
   before_script:
     - echo "{\"auths\":{\"${CI_REGISTRY}\":{\"username\":\"${CI_REGISTRY_USER}\",\"password\":\"${CI_REGISTRY_PASSWORD}\"}}}" > /kaniko/.docker/config.json
-  only:
-    - tags
   <<: *tags
 
 build-unsafe:
@@ -24,6 +22,8 @@ build-unsafe:
     - /kaniko/executor --skip-tls-verify --context ${CI_PROJECT_DIR} 
       --dockerfile ${CI_PROJECT_DIR}/Dockerfile 
       --destination ${CI_REGISTRY}/${CI_UNSAFE_PROJECT}/${CI_REPOSITORY}:${CI_COMMIT_TAG}
+  rules:
+    - if: $CI_COMMIT_BRANCH =~ "release" && $CI_COMMIT_TAG && $CI_PIPELINE_SOURCE != "web"
 
 status:
   image:
@@ -49,8 +49,8 @@ status:
       sleep 30;
       done;
       exit 1;
-  only:
-    - tags
+  rules:
+    - if: $CI_COMMIT_BRANCH =~ "release" && $CI_COMMIT_TAG && $CI_PIPELINE_SOURCE != "web"
   <<: *tags
 
 
@@ -61,3 +61,5 @@ build:
     - /kaniko/executor --skip-tls-verify --context ${CI_PROJECT_DIR} 
       --dockerfile ${CI_PROJECT_DIR}/Dockerfile 
       --destination ${CI_REGISTRY}/${CI_PROJECT}/${CI_REPOSITORY}:${CI_COMMIT_TAG}
+  rules:
+    - if: $CI_COMMIT_BRANCH =~ "release" && $CI_COMMIT_TAG
